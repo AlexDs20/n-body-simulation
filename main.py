@@ -1,4 +1,7 @@
 import numpy as np
+import matplotlib.pyplot as plt
+from pprint import pprint as pp
+import pdb
 
 class object():
     def __init__(self, init_pos, init_vel, mass, radius):
@@ -12,6 +15,7 @@ class object():
             return None
         self.mass = mass
         self.radius = radius
+        self.trajectory = [np.array(init_pos)]
 
     def __str__(self):
         return f'{self.pos}\t--\t{self.vel}'
@@ -44,7 +48,8 @@ class universe():
     #       (x_i(t+1) - x_i(t))/dt      =   v_i
     # --->  x_i(t+1)                    =   x_i(t) + dt * v_i
 
-    G = 6.6743*10**-11
+    #G = 6.6743*10**-11
+    G = 0.5
     dx_prop = 1/20
 
 
@@ -59,7 +64,7 @@ class universe():
         self.max_dx = min(o.radius for o in objects) * self.dx_prop
 
         # Set a first time step
-        self.dt = self.calc_time_step()
+        self.update_time_step()
 
 
 
@@ -81,11 +86,11 @@ class universe():
                 self.F[j, i] = - self.F[i, j]
 
 
-    def calc_time_step(self):
+    def update_time_step(self):
         # Given the current velocities and the max spatial steps, update the time step
         # Get the current max speed
         max_speed = max(o.speed() for o in self.objects)
-        return self.max_dx / max_speed
+        self.dt = self.max_dx / max_speed
 
 
     def update_velocities(self):
@@ -96,7 +101,7 @@ class universe():
 
             sum_forces = 0
             for j, o in enumerate(self.objects):
-                sum_forces += self.G * o.mass * self.F[i, j, :]
+                sum_forces += self.G * o.mass * self.F[i, j]
 
             ref.vel += self.dt * sum_forces
 
@@ -104,7 +109,9 @@ class universe():
     def update_positions(self):
         # --->  x_i(t+1)                    =   x_i(t) + dt * v_i
         for o in self.objects:
-            o.pos += self.dt * o.vel
+            new_pos = o.pos + self.dt * o.vel
+            o.pos = new_pos
+            o.trajectory.append(new_pos)
 
     def is_collision(self):
         pass
@@ -123,25 +130,51 @@ class universe():
         while t<time:
             self.calc_all_forces()
             self.update_velocities()
-            self.calc_time_step()
+            self.update_time_step()
             self.update_positions()
-            self.print()
             t = t + self.dt
+
+    def plot(self):
+        fig, ax = plt.subplots(1,1,figsize=(20,20))
+
+        for o in self.objects:
+            data = np.array(o.trajectory)
+            x = data[:, 0]
+            y = data[:, 1]
+            z = data[:, 2]
+            ax.plot(x, y, z)
+
+        min_x = min([min(np.array(o.trajectory)[:,0]) for o in self.objects])
+        max_x = max([max(np.array(o.trajectory)[:,0]) for o in self.objects])
+        min_y = min([min(np.array(o.trajectory)[:,1]) for o in self.objects])
+        max_y = max([max(np.array(o.trajectory)[:,1]) for o in self.objects])
+
+        ax.set_xlim([min_x, max_x])
+        ax.set_ylim([min_y, max_y])
+
+        plt.savefig('trajectories.png')
 
 
 def main():
-    o1 = object([0. ,     0.    ,   0.], \
-                [0. ,     0.5   ,   0.], \
-                3, \
+    o1 = object([-3. ,     0.    ,   0.], \
+                [ 0. ,   0.1     ,   0.], \
+                1, \
                 0.1)
 
-    o2 = object([1. ,     1.    ,   0.], \
-                [0. ,     0.5   ,   0.], \
-                0.1, \
-                4)
+    o2 = object([3. ,     0.    ,   0.], \
+                [0. ,   -0.1    ,   0.], \
+                1, \
+                0.1)
 
-    uni = universe([o1, o2])
-    uni.run(time=10)
+    o3 = object([20. ,     0.    ,   0.], \
+                [0.1 ,   0.1    ,   0.], \
+                1, \
+                0.1)
+
+    uni = universe([o1, o2, o3])
+    uni.run(time=500)
+    uni.plot()
+
 
 if __name__=='__main__':
     main()
